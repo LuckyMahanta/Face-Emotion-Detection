@@ -9,7 +9,7 @@ import base64
 
 capturing = False
 window_name = "Output"
-emotion_stack = []  # Use a list to simulate a stack
+emotion_stack = []
 
 client_id = 'a42ce6c619654d6e90e85bc2ae9cc2d3'
 client_secret = 'fd154a7dac254d449a5846230bc91827'
@@ -21,7 +21,6 @@ def search_playlists(keyword):
     results = sp.search(q=keyword, type='playlist')
     playlists = results['playlists']['items']
     return playlists
-
 
 def capture_emotion():
     global capturing, emotion_stack
@@ -57,11 +56,14 @@ def capture_emotion():
                 img = extract_features(image)
                 pred = model.predict(img)
                 prediction_label = labels[pred.argmax()]
-                cv2.putText(im, ' %s' % (prediction_label), (p - 10, q - 10), cv2.FONT_HERSHEY_COMPLEX_SMALL, 2,
-                            (0, 0, 255))
+                # Adjust text size based on frame size
+                text_size = min(2, max(0.5, im.shape[1] / 640))
+                cv2.putText(im, prediction_label, (p - 10, q - 10), 
+                           cv2.FONT_HERSHEY_COMPLEX_SMALL, text_size,
+                           (0, 0, 255))
                 final_emotion = prediction_label
                 if final_emotion:
-                    emotion_stack.append(final_emotion)  # Add emotion to the stack
+                    emotion_stack.append(final_emotion)
             cv2.imshow("Output", im)
             if cv2.waitKey(1) & 0xFF == ord('m'):
                 break
@@ -72,77 +74,104 @@ def capture_emotion():
     cv2.destroyAllWindows()
 
 def capture_and_recommend():
-    # capture_thread = threading.Thread(target=capture_emotion)
-    # capture_thread.start()
-
     capture_emotion()
-
-
-   # playlists=[]
 
     while True:
         if not emotion_stack:
-            continue  # Wait until an emotion is captured
-        detected_emotion = emotion_stack[-1]  # Get the last captured emotion
-        emotion_stack.clear()  # Clear the stack for the next capture
+            continue
+        detected_emotion = emotion_stack[-1]
+        emotion_stack.clear()
 
-       
         recommendation_links = list(search_playlists(detected_emotion))
-
 
         if recommendation_links:
             st.markdown(f"Detected Emotion: {detected_emotion}")
             st.markdown("""<h3 style='padding-top: 20px'>🎶Recommendation Links:</h3>""", unsafe_allow_html=True)
-            for playlist in recommendation_links:
-                st.write(playlist['name'], playlist['external_urls']['spotify'])
-
+            
+            # Create a grid layout for playlists
+            cols = st.columns(2)
+            for idx, playlist in enumerate(recommendation_links):
+                with cols[idx % 2]:
+                    st.write(playlist['name'], playlist['external_urls']['spotify'])
             break
 
-# Frontend
-
+# Frontend Setup
 st.set_page_config(
     page_title="Music Recommendation System",
     page_icon="🎵",
-    layout="wide",  
+    layout="wide",
 )
 
-# st.markdown("<p style='text-align: center;color : white; font-family:impact; font-size: 60px'>Your Mood, Your Music</p>", unsafe_allow_html=True)
-# st.markdown(" <p style='text-align: center;font-style: italic;font-size: 20px; font-family:verdana;'>~ Tune in to your emotions ~</p>", unsafe_allow_html=True)
-
+# Custom CSS for responsiveness while maintaining original colors
 st.markdown("""
-    <div style='text-align: center;'>
-        <p style='margin-bottom: 0px; color: white; font-family: impact; font-size: 60px;'>Your Mood, Your Music</p>
-        <p style='margin-top: 2px; font-size: 20px; font-family: arial;'>~ Tune in to your emotions ~</p>
+<style>
+    /* General responsive styles */
+    .stApp {
+        max-width: 100vw;
+        padding: 1rem;
+    }
+    
+    /* Header styles */
+    .header-container {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+    
+    .main-title {
+        color: white;
+        font-family: impact;
+        font-size: clamp(2rem, 5vw, 4rem);
+        margin-bottom: 0.5rem;
+    }
+    
+    .subtitle {
+        font-size: clamp(1rem, 2vw, 1.5rem);
+        font-family: arial;
+        font-style: italic;
+        margin-top: 2px;
+    }
+    
+    /* Button styles */
+    .stButton > button {
+        padding: clamp(1rem, 3vw, 2rem);
+        width: clamp(100px, 20vw, 150px);
+        height: clamp(100px, 20vw, 150px);
+        font-size: clamp(1rem, 2vw, 1.25rem);
+        border-radius: 700px;
+        margin: 0 auto;
+        display: block;
+    }
+    
+    /* Stop message styling */
+    .stop-message {
+        text-align: center;
+        color: red;
+        font-size: clamp(1rem, 1.5vw, 1.25rem);
+        font-weight: bold;
+        padding-top: 107px;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# Header
+st.markdown("""
+    <div class="header-container">
+        <div class="main-title">Your Mood, Your Music</div>
+        <div class="subtitle">~ Tune in to your emotions ~</div>
     </div>
 """, unsafe_allow_html=True)
 
-st.markdown("""
-    <style>
-  .container {
-    display: flex; 
-    justify-content: flex-end;
-    align-items: center; 
-  }
-  
-  .stButton>button {
-    padding: 20px 30px; 
-    font-size: 20px; 
-    height: 150px; 
-    width: 150px;
-    display : flex;
-    margin-left : 490px;
-    border-radius: 700px;
-  },
-""", unsafe_allow_html=True)
+# Main content
+col1, col2, col3 = st.columns([1, 2, 1])
 
-col1, col2 = st.columns([3, 2])
+with col2:
+    if st.button("Let's Go"):
+        capture_and_recommend()
 
-button_text = "Let's Go"
-if col1.button(button_text):
-    capture_and_recommend()
-
-center_text = "<center style= 'color: red;font-size: 20px; font-weight:bold; padding-top: 107px'>To Stop press m </center>"
-st.write(center_text, unsafe_allow_html=True)
+st.markdown(
+    '<div class="stop-message">To Stop press m</div>',
+    unsafe_allow_html=True
+)
 
 def get_base64(bin_file):
     with open(bin_file, 'rb') as f:
@@ -154,13 +183,14 @@ def set_background(png_file):
     page_bg_img = '''
     <style>
     .stApp {
-    background-image: url("data:image/png;base64,%s");
-    background-size: 1280px 700px;
-    background-repeat : no-repeat;    
+        background-image: url("data:image/png;base64,%s");
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        min-height: 100vh;
     }
     </style>
     ''' % bin_str
     st.markdown(page_bg_img, unsafe_allow_html=True)
-
 
 set_background('./background.png')
